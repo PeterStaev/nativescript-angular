@@ -283,7 +283,7 @@ export class PageRouterOutlet implements OnDestroy, OnInit { // tslint:disable-l
         } else {
             log("PageRouterOutlet.activate() forward navigation - " +
                 "create detached loader in the loader container");
-
+                log("_____________!!!!!");
             const page = this.pageFactory({
                 isNavigation: true,
                 componentType: factory.componentType,
@@ -291,14 +291,15 @@ export class PageRouterOutlet implements OnDestroy, OnInit { // tslint:disable-l
 
             providers.set(Page, page);
 
-            const loaderRef = this.location.createComponent(
-                this.detachedLoaderFactory, this.location.length, childInjector, []);
-            this.changeDetector.markForCheck();
-
-            this.activated = loaderRef.instance.loadWithFactory(factory);
+            // const loaderRef = this.location.createComponent(
+            //     this.detachedLoaderFactory, this.location.length, childInjector, []);
+            this.activated = factory.create(childInjector);
+            this.activated.changeDetectorRef.markForCheck();
+            // this.changeDetector.markForCheck();
+            // this.activated = loaderRef.instance.loadWithFactory(factory);
             this.loadComponentInPage(page, this.activated);
 
-            this.activated[loaderRefSymbol] = loaderRef;
+            // this.activated[loaderRefSymbol] = loaderRef;
         }
     }
 

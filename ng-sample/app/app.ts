@@ -15,6 +15,7 @@ import {
     routerTraceCategory,
     listViewTraceCategory,
     animationsTraceCategory,
+    viewUtilCategory,
     routeReuseStrategyTraceCategory,
 } from "nativescript-angular/trace";
 import { PAGE_FACTORY, PageFactory, PageFactoryOptions } from "nativescript-angular/platform-providers";
@@ -26,7 +27,7 @@ import { setCategories, enable } from "trace";
 // );
 // setCategories(routerTraceCategory);
 // setCategories(listViewTraceCategory);
-setCategories(`${routeReuseStrategyTraceCategory}`);
+setCategories(`${routeReuseStrategyTraceCategory}, ${routerTraceCategory}, ${viewUtilCategory}`);
 enable();
 
 import { RendererTest } from "./examples/renderer-test";
@@ -137,7 +138,7 @@ const customPageFactoryProvider = {
 // platformNativeScriptDynamic().bootstrapModule(makeExampleModule(ImageTest));
 // platformNativeScriptDynamic().bootstrapModule(makeExampleModule(ModalTest));
 // platformNativeScriptDynamic().bootstrapModule(makeExampleModule(HttpTest));
-platformNativeScriptDynamic().bootstrapModule(makeExampleModule(HttpClientTest));
+// platformNativeScriptDynamic().bootstrapModule(makeExampleModule(HttpClientTest));
 // platformNativeScriptDynamic().bootstrapModule(makeExampleModule(PlatfromDirectivesTest));
 // platformNativeScriptDynamic().bootstrapModule(makeExampleModule(ActionBarTest));
 
@@ -154,6 +155,10 @@ platformNativeScriptDynamic().bootstrapModule(makeExampleModule(HttpClientTest))
 // platformNativeScriptDynamic().bootstrapModule(makeExampleModule(AnimationNgClassTest));
 // platformNativeScriptDynamic().bootstrapModule(makeExampleModule(AnimationKeyframesTest));
 // platformNativeScriptDynamic().bootstrapModule(makeExampleModule(AnimationEnterLeaveTest));
+
+
+platformNativeScriptDynamic({ useAppRun: true }).bootstrapModule(makeExampleModule(RendererTest));
+
 
 // Livesync test
 let cachedUrl: string;

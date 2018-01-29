@@ -109,4 +109,8 @@ export class RendererTest {
         }
         return $event;
     }
+
+    onTap() {
+        console.log("On tap!!!");
+    }
 }

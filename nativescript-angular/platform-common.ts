@@ -18,24 +18,20 @@ import {
     EventEmitter,
     Sanitizer,
     InjectionToken,
-    StaticProvider
+    StaticProvider,
 } from "@angular/core";
 import { DOCUMENT } from "@angular/common";
 
 import { rendererLog, rendererError } from "./trace";
-import {
-    PAGE_FACTORY,
-    PageFactory,
-    defaultPageFactoryProvider,
-    setRootPage
-} from "./platform-providers";
+import { PAGE_FACTORY, PageFactory, defaultPageFactoryProvider, setRootPage } from "./platform-providers";
 
-import { start, setCssFileName } from "tns-core-modules/application";
+import { start as applicationStart, setCssFileName, run as applicationRun } from "tns-core-modules/application";
 import { topmost, NavigationEntry } from "tns-core-modules/ui/frame";
 import { Page } from "tns-core-modules/ui/page";
 import { TextView } from "tns-core-modules/ui/text-view";
 
 import "nativescript-intl";
+import { View } from "tns-core-modules/ui/core/view/view";
 
 export const onBeforeLivesync = new EventEmitter<NgModuleRef<any>>();
 export const onAfterLivesync = new EventEmitter<NgModuleRef<any>>();
@@ -52,6 +48,8 @@ export interface AppOptions {
     bootInExistingPage?: boolean;
     cssFile?: string;
     startPageActionBarHidden?: boolean;
+
+    useAppRun?: boolean;
 }
 
 export type PlatformFactory = (extraProviders?: StaticProvider[]) => PlatformRef;
@@ -65,7 +63,7 @@ export class NativeScriptSanitizer extends Sanitizer {
 // Add a fake polyfill for the document object
 (<any>global).document = (<any>global).document || {};
 const doc = (<any>global).document;
-doc.body = Object.assign((doc.body || {}), {
+doc.body = Object.assign(doc.body || {}, {
     isOverride: true,
 });
 
@@ -101,7 +99,7 @@ export class NativeScriptPlatformRef extends PlatformRef {
     bootstrapModule<M>(
         moduleType: Type<M>,
         compilerOptions: CompilerOptions | CompilerOptions[] = []
-        ): Promise<NgModuleRef<M>> {
+    ): Promise<NgModuleRef<M>> {
         this._bootstrapper = () => this.platform.bootstrapModule(moduleType, compilerOptions);
 
         this.bootstrapApp();
@@ -113,14 +111,18 @@ export class NativeScriptPlatformRef extends PlatformRef {
     private bootstrapApp() {
         (<any>global).__onLiveSyncCore = () => this.livesyncModule();
 
-        const mainPageEntry = this.createNavigationEntry(this._bootstrapper);
+        if (this.appOptions.useAppRun) {
+            this.bootstrapWithAppRun(this._bootstrapper);
+        } else {
+            const mainPageEntry = this.createNavigationEntry(this._bootstrapper);
 
-        if (this.appOptions && typeof this.appOptions.cssFile === "string") {
-            // TODO: All exported fields in ES6 modules should be read-only
-            // Change the case when tns-core-modules become ES6 compatible and there is a legal way to set cssFile
-            setCssFileName(this.appOptions.cssFile);
+            if (this.appOptions && typeof this.appOptions.cssFile === "string") {
+                // TODO: All exported fields in ES6 modules should be read-only
+                // Change the case when tns-core-modules become ES6 compatible and there is a legal way to set cssFile
+                setCssFileName(this.appOptions.cssFile);
+            }
+            applicationStart(mainPageEntry);
         }
-        start(mainPageEntry);
     }
 
     livesyncModule(): void {
@@ -168,8 +170,8 @@ export class NativeScriptPlatformRef extends PlatformRef {
         resolve?: (comp: NgModuleRef<any>) => void,
         reject?: (e: Error) => void,
         isLivesync: boolean = false,
-        isReboot: boolean = false): NavigationEntry {
-
+        isReboot: boolean = false
+    ): NavigationEntry {
         const pageFactory: PageFactory = this.platform.injector.get(PAGE_FACTORY);
 
         const navEntry: NavigationEntry = {
@@ -180,8 +182,7 @@ export class NativeScriptPlatformRef extends PlatformRef {
                     page.actionBarHidden = this.appOptions.startPageActionBarHidden;
                 }
 
-                const initHandlerMethodName =
-                    "nativescript-angular/platform-common.initHandler";
+                const initHandlerMethodName = "nativescript-angular/platform-common.initHandler";
                 const initHandler = profile(initHandlerMethodName, () => {
                     page.off(Page.navigatingToEvent, initHandler);
                     // profiling.stop("application-start");
@@ -190,30 +191,32 @@ export class NativeScriptPlatformRef extends PlatformRef {
                     // profiling.start("ng-bootstrap");
                     rendererLog("BOOTSTRAPPING...");
 
-                    const bootstrapMethodName =
-                        "nativescript-angular/platform-common.postBootstrapAction";
-                    bootstrapAction().then(profile(bootstrapMethodName, moduleRef => {
-                        // profiling.stop("ng-bootstrap");
-                        log(`ANGULAR BOOTSTRAP DONE. ${uptime()}`);
-                        lastBootstrappedModule = new WeakRef(moduleRef);
+                    const bootstrapMethodName = "nativescript-angular/platform-common.postBootstrapAction";
+                    bootstrapAction().then(
+                        profile(bootstrapMethodName, moduleRef => {
+                            // profiling.stop("ng-bootstrap");
+                            log(`ANGULAR BOOTSTRAP DONE. ${uptime()}`);
+                            lastBootstrappedModule = new WeakRef(moduleRef);
 
-                        if (resolve) {
-                            resolve(moduleRef);
+                            if (resolve) {
+                                resolve(moduleRef);
+                            }
+                            return moduleRef;
+                        }),
+                        err => {
+                            rendererError("ERROR BOOTSTRAPPING ANGULAR");
+                            const errorMessage = err.message + "\n\n" + err.stack;
+                            rendererError(errorMessage);
+
+                            let view = new TextView();
+                            view.text = errorMessage;
+                            page.content = view;
+
+                            if (reject) {
+                                reject(err);
+                            }
                         }
-                        return moduleRef;
-                    }), err => {
-                        rendererError("ERROR BOOTSTRAPPING ANGULAR");
-                        const errorMessage = err.message + "\n\n" + err.stack;
-                        rendererError(errorMessage);
-
-                        let view = new TextView();
-                        view.text = errorMessage;
-                        page.content = view;
-
-                        if (reject) {
-                            reject(err);
-                        }
-                    });
+                    );
 
                     (<any>global).Zone.drainMicroTaskQueue();
                 });
@@ -222,7 +225,7 @@ export class NativeScriptPlatformRef extends PlatformRef {
 
                 return page;
             },
-            animated: false
+            animated: false,
         };
 
         if (isReboot) {
@@ -232,6 +235,36 @@ export class NativeScriptPlatformRef extends PlatformRef {
         return navEntry;
     }
 
-    liveSyncApp() {
+    liveSyncApp() {}
+
+    @profile
+    private bootstrapWithAppRun(
+        bootstrapAction: BootstrapperAction,
+        resolve?: (comp: NgModuleRef<any>) => void,
+        reject?: (e: Error) => void,
+        isLivesync: boolean = false,
+        isReboot: boolean = false
+    ) {
+        const page = new Page();
+        setRootPage(page);
+
+        console.log("---------- bootstrapWithAppRun ------------ ");
+        const res = bootstrapAction().then(result => {
+            console.log("---------- bootstrapAction done ------------ ");
+
+            const content = page.content;
+            console.log("---------- page.content: " + page.content);
+
+            page.content = null;
+
+            const navEntry: NavigationEntry = {
+                create: () => {
+                    return <Page>content;
+                },
+                animated: false,
+            };
+
+            applicationRun(navEntry);
+        });
     }
 }

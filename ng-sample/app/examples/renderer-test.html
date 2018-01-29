@@ -1,4 +1,4 @@
-<ScrollView>
+<!-- <ScrollView>
     <StackLayout orientation='vertical'>
         <Label [text]='model.mydate | date:"fullDate"' [ngStyle]="{'background-color': 'lime'}"></Label>
         <Progress value="50" style="color: red"></Progress>
@@ -27,4 +27,8 @@
         <Label text='==============================' fontSize='20'></Label>
         <templated-component [renderChild]="true"></templated-component>
     </StackLayout>
-</ScrollView>
+</ScrollView> -->
+<StackLayout >
+    <Label [text]='model.mydate | date:"fullDate"' [ngStyle]="{'background-color': 'lime'}"></Label>
+    <button text="hey there" (tap)="onTap()"></button>
+</StackLayout>
